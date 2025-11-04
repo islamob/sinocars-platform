@@ -65,7 +65,6 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             .select(`
                 *, 
                 seller:profiles(contact_person),
-                // FIX: Added .default=true to ensure listings with zero ratings are included (LEFT JOIN).
                 ratings:user_ratings!rated_user_id(avg(rating), count).default=true 
             `)
             .eq('status', 'approved')
