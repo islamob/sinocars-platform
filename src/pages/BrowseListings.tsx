@@ -68,7 +68,7 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             .order('created_at', { ascending: false });
 
         if (listingsError || !listingsData) {
-            console.error('Error fetching listings:', listingsError);
+            console.error('Error fetching listings:', error, JSON.stringify(error));
             setListings([]);
             setFilteredListings([]);
             setLoading(false);
