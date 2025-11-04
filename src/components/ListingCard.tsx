@@ -57,12 +57,22 @@ export default function ListingCard({ listing, navigateToUser }: ListingCardProp
                 <User size={16} className="mr-2 text-gray-600" />
                 <span>
                     {t('postedBy')}: 
+                   // Inside src/components/ListingCard.tsx
+
+                    // ... (inside the return statement)
+
                     <button
-                        // Use seller_id (the UUID) for navigation, not the name
-                        onClick={() => navigateToUser(listing.seller_id)} 
+                        // CRITICAL CHECK: Ensure listing.seller_id exists and is valid.
+                        onClick={() => {
+                        if (listing.seller_id) {
+                        navigateToUser(listing.seller_id);
+                        } else {
+                        console.error("Attempted to navigate, but seller_id is missing!");
+                        }
+                        }}
                         className="font-semibold text-blue-700 hover:text-blue-900 hover:underline ml-1 cursor-pointer"
-                    >
-                        {sellerName}
+                        >
+                    {sellerName}
                     </button>
                 </span>
             </div>
