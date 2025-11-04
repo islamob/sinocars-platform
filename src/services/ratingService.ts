@@ -1,68 +1,40 @@
-// src/services/ratingService.ts (FULL CONTENTS - including the fix for fetchAverageRating)
+// Inside src/lib/ratingService.ts (or similar)
 
-import { supabase } from '../lib/supabase'; 
-import { Database } from '../lib/database.types'; // Assuming you have this defined
+import { supabase } from './supabase'; // Adjust path as needed
 
-// Define the type for the table
-type NewRating = Database['public']['Tables']['user_ratings']['Insert'];
-
-// -------------------------------------------------------------------
-// 1. Service function for fetching ratings (Solved previous issue)
-// -------------------------------------------------------------------
-interface RatingResult {
-    average_rating: number;
-    total_ratings: number;
+interface RatingPayload {
+    ratedUserId: string;
+    rating: number;
+    feedback: string;
 }
 
-export const fetchAverageRating = async (userId: string): Promise<RatingResult> => {
-    // (Content of the function provided in the previous step)
-    const { data: avgData, error: avgError } = await supabase
-        .from('user_ratings')
-        .select('avg(rating), count')
-        .eq('rated_user_id', userId)
-        .maybeSingle();
-
-    if (avgError) {
-        console.error('SUPABASE ERROR in fetchAverageRating:', avgError);
-        return { average_rating: 0, total_ratings: 0 };
-    }
+// Ensure the function is strongly typed and handles errors by throwing
+export async function submitRating({ ratedUserId, rating, feedback }: RatingPayload) {
     
-    if (avgData && avgData.count > 0 && avgData.avg !== null) {
-        return {
-            average_rating: parseFloat(avgData.avg),
-            total_ratings: avgData.count,
-        };
+    // We expect the user to be logged in, so we get the rater's ID
+    const raterId = supabase.auth.getUser()?.data.user?.id;
+
+    if (!raterId) {
+        throw new Error('User must be logged in to submit a rating.');
     }
-    
-    return { average_rating: 0, total_ratings: 0 };
-};
 
-
-// -------------------------------------------------------------------
-// 2. Service function for submitting ratings (The missing export/function)
-// -------------------------------------------------------------------
-export const submitRating = async (
-    reviewerId: string, 
-    ratedUserId: string, 
-    rating: number, 
-    comment: string
-): Promise<{ success: boolean; error: string | null }> => {
-
-    const newRating: NewRating = {
-        reviewer_id: reviewerId,
+    const newRating = {
+        rater_user_id: raterId,
         rated_user_id: ratedUserId,
         rating: rating,
-        comment: comment,
+        feedback: feedback,
     };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from('user_ratings')
-        .insert([newRating]);
+        .insert(newRating);
 
+    // If Supabase returns an RLS or other database error, throw it so RatingForm catches it
     if (error) {
-        console.error('Error submitting rating:', error);
-        return { success: false, error: error.message };
+        console.error('Supabase rating submission error:', error.message);
+        throw new Error(`DB Error: ${error.message}`);
     }
 
-    return { success: true, error: null };
-};
+    // The function simply returns (or returns data) on success
+    return data;
+}
