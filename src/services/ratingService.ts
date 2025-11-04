@@ -1,44 +1,68 @@
-// src/services/ratingService.ts
+// src/services/ratingService.ts (FULL CONTENTS - including the fix for fetchAverageRating)
 
-// Assuming you fixed this path error from the previous step
-import { supabase } from '../lib/supabase'; // Correct path to your Supabase client
+import { supabase } from '../lib/supabase'; 
+import { Database } from '../lib/database.types'; // Assuming you have this defined
 
+// Define the type for the table
+type NewRating = Database['public']['Tables']['user_ratings']['Insert'];
+
+// -------------------------------------------------------------------
+// 1. Service function for fetching ratings (Solved previous issue)
+// -------------------------------------------------------------------
 interface RatingResult {
     average_rating: number;
     total_ratings: number;
 }
 
 export const fetchAverageRating = async (userId: string): Promise<RatingResult> => {
-    
-    // --- 1. Fetch the Average Rating ---
+    // (Content of the function provided in the previous step)
     const { data: avgData, error: avgError } = await supabase
         .from('user_ratings')
-        // Supabase function to calculate average and count in one query
         .select('avg(rating), count')
         .eq('rated_user_id', userId)
         .maybeSingle();
 
     if (avgError) {
         console.error('SUPABASE ERROR in fetchAverageRating:', avgError);
-        // Fallback to 0 if there's an error
         return { average_rating: 0, total_ratings: 0 };
     }
     
-    // The data returned is an array containing one object like:
-    // { "avg": "4.5", "count": 10 }
-    
-    // Check if the result is valid
     if (avgData && avgData.count > 0 && avgData.avg !== null) {
-        // Supabase returns aggregation results as strings. We must parse them.
-        const average = parseFloat(avgData.avg);
-        const count = avgData.count;
-
         return {
-            average_rating: average,
-            total_ratings: count,
+            average_rating: parseFloat(avgData.avg),
+            total_ratings: avgData.count,
         };
     }
     
-    // Return 0 if no ratings are found for the user
     return { average_rating: 0, total_ratings: 0 };
+};
+
+
+// -------------------------------------------------------------------
+// 2. Service function for submitting ratings (The missing export/function)
+// -------------------------------------------------------------------
+export const submitRating = async (
+    reviewerId: string, 
+    ratedUserId: string, 
+    rating: number, 
+    comment: string
+): Promise<{ success: boolean; error: string | null }> => {
+
+    const newRating: NewRating = {
+        reviewer_id: reviewerId,
+        rated_user_id: ratedUserId,
+        rating: rating,
+        comment: comment,
+    };
+
+    const { error } = await supabase
+        .from('user_ratings')
+        .insert([newRating]);
+
+    if (error) {
+        console.error('Error submitting rating:', error);
+        return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
 };
