@@ -12,7 +12,9 @@ export async function submitRating({ ratedUserId, rating, feedback }: RatingPayl
   if (userError || !userData?.user) throw new Error('User must be logged in to submit a rating.');
   const reviewerId = userData.user.id;
   const newRating = { reviewer_id: reviewerId, rated_user_id: ratedUserId, rating, feedback };
-  const { data, error } = await supabase.from('user_ratings').insert([newRating]);
+  const { data, error } = await supabaseconst { data, error } = await supabase
+  .from('user_ratings_summary')
+  .select('*');
   if (error) throw new Error(`DB Error: ${error.message}`);
   return data;
 }
