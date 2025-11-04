@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+// src/pages/BrowseListings.tsx
+
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,17 +11,23 @@ import ListingCard from '../components/ListingCard';
 import ListingForm from '../components/ListingForm';
 
 // ----------------------------------------------------
-// 1. DEFINE EXTENDED TYPES (Using 'contact_person')
+// 1. DEFINE EXTENDED TYPES (Updated for rating data structure)
 // ----------------------------------------------------
 interface SellerProfile {
-    contact_person: string | null; // Corrected column name
+    contact_person: string | null;
 }
-
+interface ListingRatings {
+    // Supabase aggregation returns 'avg' as a string (or null if no ratings)
+    avg: string | null; 
+    count: number | null; 
+}
 type BaseListing = Database['public']['Tables']['listings']['Row'];
 
-// This export allows ListingCard to import this type
+// This is the definitive type for a listing on this page
 export interface ListingWithSeller extends BaseListing {
     seller: SellerProfile | null;
+    // The joined 'ratings' will be an array of one object due to aggregation
+    ratings: [ListingRatings] | null; 
 }
 type Listing = ListingWithSeller; 
 // ----------------------------------------------------
@@ -28,11 +36,11 @@ type Listing = ListingWithSeller;
 // 2. DEFINE COMPONENT PROPS
 // ----------------------------------------------------
 interface BrowseListingsProps {
-  navigateToUser: (userId: string) => void; 
+    navigateToUser: (userId: string) => void; 
 }
 // ----------------------------------------------------
 
-// 3. Accept the new prop
+
 export default function BrowseListings({ navigateToUser }: BrowseListingsProps) {
     
     const [listings, setListings] = useState<Listing[]>([]);
@@ -48,19 +56,17 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
     const { user } = useAuth();
     const { t } = useLanguage();
 
-    const fetchListings = async () => {
+    // Make fetchListings a useCallback hook to stabilize the dependency array
+    const fetchListings = useCallback(async () => {
         setLoading(true);
-        // ------- CORRECTED QUERY ---------
-        // `.select()` comes after `.from()`
-        // The commented line in the original code was trying to chain .select before .from -- fix to proper order.
-        // Also, Supabase `select` syntax for foreign tables is: .select('*, seller:profiles(contact_person)')
+        
         const { data, error } = await supabase
             .from('listings')
-           .select(`
+            .select(`
                 *, 
                 seller:profiles(contact_person),
-                // NEW: Join the ratings table to get the average score and count
-                ratings:user_ratings!rated_user_id(avg(rating), count) 
+                // FIX: Added .default=true to ensure listings with zero ratings are included (LEFT JOIN).
+                ratings:user_ratings!rated_user_id(avg(rating), count).default=true 
             `)
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
@@ -74,12 +80,11 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             setFilteredListings((data as Listing[]) || []);
         }
         setLoading(false);
-    };
+    }, []); // Dependency array is empty as it only depends on supabase object
 
     useEffect(() => {
         fetchListings();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [fetchListings]); // Depend on the stable fetchListings function
 
     useEffect(() => {
         let filtered = listings;
@@ -121,99 +126,99 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* ... (Header and Filter JSX is unchanged) ... */}
             <div className="flex justify-between items-center mb-8">
-      <h2 className="text-3xl font-bold text-gray-900">{t('browseListings')}</h2>
-      {user && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={20} />
-          <span>{t('createListing')}</span>
-        </button>
-      )}
-    </div>
-
-    <div className="mb-6 space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder={t('search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center justify-center space-x-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-        >
-          <Filter size={20} />
-          <span>{t('filter')}</span>
-        </button>
-      </div>
-
-      {showFilters && (
-        <div className="bg-gray-50 p-4 rounded-md space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('listingType')}
-              </label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">{t('allListings')}</option>
-                <option value="offer">{t('offers')}</option>
-                <option value="request">{t('requests')}</option>
-              </select>
+                <h2 className="text-3xl font-bold text-gray-900">{t('browseListings')}</h2>
+                {user && (
+                    <button
+                        onClick={() => setShowForm(true)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                        <Plus size={20} />
+                        <span>{t('createListing')}</span>
+                    </button>
+                )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('departureCityChina')}
-              </label>
-              <select
-                value={filterDepartureCity}
-                onChange={(e) => setFilterDepartureCity(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All cities</option>
-                {CHINESE_CITIES.map((city) => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
+            <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder={t('search')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="flex items-center justify-center space-x-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    >
+                        <Filter size={20} />
+                        <span>{t('filter')}</span>
+                    </button>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('arrivalCityAlgeria')}
-              </label>
-              <select
-                value={filterArrivalCity}
-                onChange={(e) => setFilterArrivalCity(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All cities</option>
-                {ALGERIAN_CITIES.map((city) => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+                {showFilters && (
+                    <div className="bg-gray-50 p-4 rounded-md space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {t('listingType')}
+                                </label>
+                                <select
+                                    value={filterType}
+                                    onChange={(e) => setFilterType(e.target.value as any)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="all">{t('allListings')}</option>
+                                    <option value="offer">{t('offers')}</option>
+                                    <option value="request">{t('requests')}</option>
+                                </select>
+                            </div>
 
-          <button
-            onClick={clearFilters}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            Clear all filters
-          </button>
-        </div>
-      )}
-    </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {t('departureCityChina')}
+                                </label>
+                                <select
+                                    value={filterDepartureCity}
+                                    onChange={(e) => setFilterDepartureCity(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">All cities</option>
+                                    {CHINESE_CITIES.map((city) => (
+                                        <option key={city} value={city}>{city}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {t('arrivalCityAlgeria')}
+                                </label>
+                                <select
+                                    value={filterArrivalCity}
+                                    onChange={(e) => setFilterArrivalCity(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="">All cities</option>
+                                    {ALGERIAN_CITIES.map((city) => (
+                                        <option key={city} value={city}>{city}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={clearFilters}
+                            className="text-sm text-blue-600 hover:text-blue-800"
+                        >
+                            Clear all filters
+                        </button>
+                    </div>
+                )}
+            </div>
 
             <div className="mb-4 text-sm text-gray-600">
                 {filteredListings.length} {filteredListings.length === 1 ? 'listing' : 'listings'} found
@@ -247,13 +252,4 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             />
         </div>
     );
-}
-interface ListingRatings {
-    avg: number | null;
-    count: number;
-}
-export interface ListingWithSeller extends BaseListing {
-    seller: SellerProfile | null;
-    // The joined 'ratings' will be an array of one object due to aggregation
-    ratings: [ListingRatings] | null; 
 }
