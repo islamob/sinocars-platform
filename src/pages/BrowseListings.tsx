@@ -12,7 +12,7 @@ import ListingForm from '../components/ListingForm';
 // 1. DEFINE EXTENDED TYPES (Updated Data Structure after JOIN)
 // ----------------------------------------------------
 interface SellerProfile {
-    username: string | null;
+    contact_person: string | null;
 }
 
 type BaseListing = Database['public']['Tables']['listings']['Row'];
