@@ -51,12 +51,13 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
     const fetchListings = async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from('listings')
+    
             .select(`
                 *, 
                 // 4. CORRECTED QUERY: Uses 'contact_person'
                 seller:profiles(contact_person) 
             `)
+            .from('listings')
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
 
