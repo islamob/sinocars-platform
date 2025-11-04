@@ -10,7 +10,7 @@ import { Database } from '../lib/database.types';
 
 // Define the nested profile structure
 interface SellerProfile {
-    username: string | null;
+    contact_person: string | null;
 }
 
 // Define the full listing type including the joined 'seller' data
@@ -33,8 +33,8 @@ export default function ListingCard({ listing }: ListingCardProps) {
 
     const isOffer = listing.listing_type === 'offer';
     
-    // Access the seller's username with a safe fallback
-    const sellerName = listing.seller?.username || t('unknownUser');
+    // Access the seller's contact_person with a safe fallback
+    const sellerName = listing.seller?.contact_person || t('unknownUser');
 
     return (
         <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
