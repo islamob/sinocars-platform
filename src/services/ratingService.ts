@@ -1,6 +1,6 @@
 // src/services/ratingService.ts
 
-import { supabase } from 'src/lib/supabase.ts'; // Adjust path as needed
+import { supabase } from '../lib/supabase.ts'; // Adjust path as needed
 
 interface RatingData {
     ratedUserId: string;
