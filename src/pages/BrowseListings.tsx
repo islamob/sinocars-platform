@@ -56,7 +56,12 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
         // Also, Supabase `select` syntax for foreign tables is: .select('*, seller:profiles(contact_person)')
         const { data, error } = await supabase
             .from('listings')
-            .select('*, seller:profiles(contact_person)')
+           .select(`
+                *, 
+                seller:profiles(contact_person),
+                // NEW: Join the ratings table to get the average score and count
+                ratings:user_ratings!rated_user_id(avg(rating), count) 
+            `)
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
 
