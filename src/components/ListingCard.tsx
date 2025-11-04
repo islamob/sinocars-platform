@@ -1,39 +1,35 @@
 import { useState } from 'react';
-import { MapPin, Calendar, Car, Phone, Mail, Eye, User } from 'lucide-react'; // Added 'User' icon
+import { MapPin, Calendar, Car, Phone, Mail, Eye, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Database } from '../lib/database.types';
 
-// ----------------------------------------------------
-// 1. IMPORT/DEFINE THE EXTENDED TYPE
-// ----------------------------------------------------
-
-// Define the nested profile structure
+// 1. DEFINE THE CORRECT TYPES (matching BrowseListings.tsx)
 interface SellerProfile {
     contact_person: string | null;
 }
-
-// Define the full listing type including the joined 'seller' data
-// This is an approximation; ideally, you would import this from BrowseListings.tsx
 type BaseListing = Database['public']['Tables']['listings']['Row'];
-interface ListingWithSeller extends BaseListing {
+export interface ListingWithSeller extends BaseListing {
     seller: SellerProfile | null;
-}
-
-// Use the extended type for the component prop
-interface ListingCardProps {
-    listing: ListingWithSeller;
 }
 // ----------------------------------------------------
 
-export default function ListingCard({ listing }: ListingCardProps) {
+// 2. UPDATE THE PROPS INTERFACE
+interface ListingCardProps {
+    listing: ListingWithSeller;
+    navigateToUser: (userId: string) => void;
+}
+// ----------------------------------------------------
+
+// 3. Destructure the new prop
+export default function ListingCard({ listing, navigateToUser }: ListingCardProps) {
     const [showContact, setShowContact] = useState(false);
     const { user } = useAuth();
     const { t } = useLanguage();
 
     const isOffer = listing.listing_type === 'offer';
     
-    // Access the seller's contact_person with a safe fallback
+    // 4. Access the CORRECT column 'contact_person'
     const sellerName = listing.seller?.contact_person || t('unknownUser');
 
     return (
@@ -56,77 +52,85 @@ export default function ListingCard({ listing }: ListingCardProps) {
                 </div>
             </div>
 
-            {/* NEW: Display the Seller's Name */}
+            {/* 5. ADD CLICKABLE USERNAME */}
             <div className="flex items-center text-sm text-gray-700 mb-4">
                 <User size={16} className="mr-2 text-gray-600" />
                 <span>
-                    {t('postedBy')}: <strong className="font-semibold text-blue-700">{sellerName}</strong>
+                    {t('postedBy')}: 
+                    <button
+                        // Use seller_id (the UUID) for navigation, not the name
+                        onClick={() => navigateToUser(listing.seller_id)} 
+                        className="font-semibold text-blue-700 hover:text-blue-900 hover:underline ml-1 cursor-pointer"
+                    >
+                        {sellerName}
+                    </button>
                 </span>
             </div>
-            {/* END NEW SECTION */}
 
             <div className="space-y-3 mb-4">
+                {/* ... (Rest of the listing details JSX is unchanged) ... */}
                 <div className="flex items-center text-sm text-gray-700">
-                    <MapPin size={16} className="mr-2 text-blue-600" />
-                    <span>
-                        {listing.departure_city_china} → {listing.arrival_city_algeria}
-                    </span>
-                </div>
+          <MapPin size={16} className="mr-2 text-blue-600" />
+          <span>
+            {listing.departure_city_china} → {listing.arrival_city_algeria}
+          </span>
+        </div>
 
-                <div className="flex items-center text-sm text-gray-700">
-                    <MapPin size={16} className="mr-2 text-green-600" />
-                    <span>
-                        {listing.port_loading} → {listing.port_arrival}
-                    </span>
-                </div>
+        <div className="flex items-center text-sm text-gray-700">
+          <MapPin size={16} className="mr-2 text-green-600" />
+          <span>
+            {listing.port_loading} → {listing.port_arrival}
+          </span>
+        </div>
 
-                <div className="flex items-center text-sm text-gray-700">
-                    <Calendar size={16} className="mr-2 text-gray-600" />
-                    <span>{new Date(listing.estimated_shipping_date).toLocaleDateString()}</span>
-                </div>
+        <div className="flex items-center text-sm text-gray-700">
+          <Calendar size={16} className="mr-2 text-gray-600" />
+          <span>{new Date(listing.estimated_shipping_date).toLocaleDateString()}</span>
+        </div>
 
-                <div className="flex items-center text-sm text-gray-700">
-                    <Car size={16} className="mr-2 text-gray-600" />
-                    <span>
-                        {listing.spots_count} {listing.spots_count > 1 ? t('spots') : t('spot')} • {listing.car_types}
-                    </span>
-                </div>
+        <div className="flex items-center text-sm text-gray-700">
+          <Car size={16} className="mr-2 text-gray-600" />
+          <span>
+            {listing.spots_count} {listing.spots_count > 1 ? t('spots') : t('spot')} • {listing.car_types}
+          </span>
+        </div>
             </div>
 
             <div className="border-t pt-4">
+                {/* ... (Contact reveal logic is unchanged) ... */}
                 {user ? (
-                    showContact ? (
-                        <div className="space-y-2">
-                            <div className="flex items-center text-sm text-gray-700">
-                                <Mail size={16} className="mr-2 text-blue-600" />
-                                <a href={`mailto:${listing.contact_email}`} className="hover:text-blue-600">
-                                    {listing.contact_email}
-                                </a>
-                            </div>
-                            <div className="flex items-center text-sm text-gray-700">
-                                <Phone size={16} className="mr-2 text-green-600" />
-                                <a href={`tel:${listing.contact_phone}`} className="hover:text-green-600">
-                                    {listing.contact_phone}
-                                </a>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setShowContact(true)}
-                            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                            <Eye size={18} />
-                            <span>{t('revealContact')}</span>
-                        </button>
-                    )
-                ) : (
-                    <div className="text-center">
-                        <p className="text-sm text-gray-600 mb-2">{t('loginRequired')}</p>
-                        <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md cursor-not-allowed">
-                            {t('revealContact')}
-                        </button>
-                    </div>
-                )}
+          showContact ? (
+            <div className="space-y-2">
+              <div className="flex items-center text-sm text-gray-700">
+                <Mail size={16} className="mr-2 text-blue-600" />
+                <a href={`mailto:${listing.contact_email}`} className="hover:text-blue-600">
+                  {listing.contact_email}
+                </a>
+              </div>
+              <div className="flex items-center text-sm text-gray-700">
+                <Phone size={16} className="mr-2 text-green-600" />
+                <a href={`tel:${listing.contact_phone}`} className="hover:text-green-600">
+                  {listing.contact_phone}
+                </a>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowContact(true)}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Eye size={18} />
+              <span>{t('revealContact')}</span>
+            </button>
+          )
+        ) : (
+          <div className="text-center">
+            <p className="text-sm text-gray-600 mb-2">{t('loginRequired')}</p>
+            <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md cursor-not-allowed">
+              {t('revealContact')}
+            </button>
+          </div>
+        )}
             </div>
         </div>
     );
