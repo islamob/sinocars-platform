@@ -50,28 +50,30 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
 
     const fetchListings = async () => {
         setLoading(true);
+        // ------- CORRECTED QUERY ---------
+        // `.select()` comes after `.from()`
+        // The commented line in the original code was trying to chain .select before .from -- fix to proper order.
+        // Also, Supabase `select` syntax for foreign tables is: .select('*, seller:profiles(contact_person)')
         const { data, error } = await supabase
-    
-            .select(`
-                *, 
-                // 4. CORRECTED QUERY: Uses 'contact_person'
-                seller:profiles(contact_person) 
-            `)
             .from('listings')
+            .select('*, seller:profiles(contact_person)')
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
 
         if (error) {
             console.error('Error fetching listings:', error);
+            setListings([]);
+            setFilteredListings([]);
         } else {
-            setListings(data as Listing[] || []);
-            setFilteredListings(data as Listing[] || []);
+            setListings((data as Listing[]) || []);
+            setFilteredListings((data as Listing[]) || []);
         }
         setLoading(false);
     };
 
     useEffect(() => {
         fetchListings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
