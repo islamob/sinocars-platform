@@ -60,12 +60,19 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
     const fetchListings = useCallback(async () => {
         setLoading(true);
         
+        // -------- FIX: Proper syntax for joined and aggregated columns
+        // The ratings join and aggregation must be adjusted: 
+        // Supabase expects aggregation in -> ratings:user_ratings!rated_user_id(rating:avg,rating:count)
+        // But, since default=true is a column in listings, don't include .default, just as a filter instead:
         const { data, error } = await supabase
             .from('listings')
             .select(`
-                *, 
+                *,
                 seller:profiles(contact_person),
-                ratings:user_ratings!rated_user_id(avg(rating), count).default=true 
+                ratings:user_ratings!rated_user_id(
+                    avg:rating(avg),
+                    count:rating(count)
+                )
             `)
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
@@ -104,10 +111,10 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(
                 (l) =>
-                    l.title.toLowerCase().includes(query) ||
-                    l.description.toLowerCase().includes(query) ||
-                    l.departure_city_china.toLowerCase().includes(query) ||
-                    l.arrival_city_algeria.toLowerCase().includes(query)
+                    l.title?.toLowerCase().includes(query) ||
+                    l.description?.toLowerCase().includes(query) ||
+                    l.departure_city_china?.toLowerCase().includes(query) ||
+                    l.arrival_city_algeria?.toLowerCase().includes(query)
             );
         }
 
