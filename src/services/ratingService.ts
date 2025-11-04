@@ -1,54 +1,44 @@
 // src/services/ratingService.ts
 
-import { supabase } from '../lib/supabase.ts'; // Adjust path as needed
+// Assuming you fixed this path error from the previous step
+import { supabase } from '../lib/supabase'; // Correct path to your Supabase client
 
-interface RatingData {
-    ratedUserId: string;
-    rating: number; // e.g., 1 to 5
-    feedback: string;
+interface RatingResult {
+    average_rating: number;
+    total_ratings: number;
 }
 
-// Function to submit a new rating
-export async function submitRating({ ratedUserId, rating, feedback }: RatingData) {
-    // Supabase will automatically use the user ID from the active session
-    // to populate the 'reviewer_id' if you're using the client.
+export const fetchAverageRating = async (userId: string): Promise<RatingResult> => {
     
-    // IMPORTANT: We include 'reviewer_id' manually here to ensure our RLS policy works correctly
-    // which checks that 'reviewer_id' equals the current 'auth.uid()'.
-    const user = await supabase.auth.getUser();
-    if (!user.data.user) {
-        throw new Error("User must be logged in to submit a rating.");
-    }
-    
-    const { data, error } = await supabase
+    // --- 1. Fetch the Average Rating ---
+    const { data: avgData, error: avgError } = await supabase
         .from('user_ratings')
-        .insert({
-            rated_user_id: ratedUserId,
-            reviewer_id: user.data.user.id, // Ensure this matches the auth.uid() for RLS
-            rating: rating,
-            feedback: feedback,
-        });
-
-    if (error) {
-        console.error('Error submitting rating:', error.message);
-        throw error; // Propagate the error to the UI
-    }
-
-    return data;
-}
-
-// Function to fetch a user's average rating (from your SQL View)
-export async function fetchAverageRating(userId: string) {
-    const { data, error } = await supabase
-        .from('user_average_ratings') // Your custom SQL View
-        .select('average_rating, total_ratings')
+        // Supabase function to calculate average and count in one query
+        .select('avg(rating), count')
         .eq('rated_user_id', userId)
-        .single(); // Use .single() as we expect only one row per user
+        .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 means 'no row found' (user has no ratings yet)
-        console.error('Error fetching average rating:', error.message);
+    if (avgError) {
+        console.error('SUPABASE ERROR in fetchAverageRating:', avgError);
+        // Fallback to 0 if there's an error
         return { average_rating: 0, total_ratings: 0 };
     }
+    
+    // The data returned is an array containing one object like:
+    // { "avg": "4.5", "count": 10 }
+    
+    // Check if the result is valid
+    if (avgData && avgData.count > 0 && avgData.avg !== null) {
+        // Supabase returns aggregation results as strings. We must parse them.
+        const average = parseFloat(avgData.avg);
+        const count = avgData.count;
 
-    return data || { average_rating: 0, total_ratings: 0 };
-}
+        return {
+            average_rating: average,
+            total_ratings: count,
+        };
+    }
+    
+    // Return 0 if no ratings are found for the user
+    return { average_rating: 0, total_ratings: 0 };
+};
