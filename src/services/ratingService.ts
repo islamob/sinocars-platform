@@ -1,5 +1,6 @@
 // src/services/ratingService.ts
-import { supabase } from '../lib/supabase';
+
+import { supabase } from '../lib/supabase.ts';
 
 interface RatingPayload {
   ratedUserId: string;
@@ -35,16 +36,27 @@ export async function submitRating({ ratedUserId, rating, feedback }: RatingPayl
   return data;
 }
 
-export async function getUserRatingsSummary() {
-  try {
-    const { data, error } = await supabase
-      .from('user_ratings')
-      .select('rated_user_id, rating, feedback, created_at');
+export async function fetchAverageRating(userId: string) {
+  const { data, error } = await supabase
+    .from('user_ratings')
+    .select('rating')
+    .eq('rated_user_id', userId);
 
-    if (error) throw error;
-    return data;
-  } catch (err) {
-    console.error('Error fetching ratings:', err);
-    return [];
+  if (error) {
+    console.error('Error fetching ratings:', error);
+    throw error;
   }
+
+  if (!data || data.length === 0) {
+    return { average_rating: 0, total_ratings: 0 };
+  }
+
+  const ratings = data.map((r) => r.rating);
+  const average =
+    ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+
+  return {
+    average_rating: average,
+    total_ratings: ratings.length,
+  };
 }
