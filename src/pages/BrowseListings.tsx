@@ -55,7 +55,7 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             .from('listings')
             .select(`
                 *, 
-                seller:profiles(username) // The JOIN is correctly implemented here
+                seller:profiles(contact_person) // The JOIN is correctly implemented here
             `)
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
