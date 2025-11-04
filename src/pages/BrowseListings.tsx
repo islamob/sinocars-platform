@@ -1,5 +1,3 @@
-// src/pages/BrowseListings.tsx
-
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -17,7 +15,6 @@ interface SellerProfile {
     contact_person: string | null;
 }
 interface ListingRatings {
-    // Supabase aggregation returns 'avg' as a string (or null if no ratings)
     avg: string | null; 
     count: number | null; 
 }
@@ -26,8 +23,8 @@ type BaseListing = Database['public']['Tables']['listings']['Row'];
 // This is the definitive type for a listing on this page
 export interface ListingWithSeller extends BaseListing {
     seller: SellerProfile | null;
-    // The joined 'ratings' will be an array of one object due to aggregation
-    ratings: [ListingRatings] | null; 
+    // We now add ratings directly (per seller)
+    ratings: ListingRatings | null;
 }
 type Listing = ListingWithSeller; 
 // ----------------------------------------------------
@@ -56,35 +53,57 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
     const { user } = useAuth();
     const { t } = useLanguage();
 
-    // Make fetchListings a useCallback hook to stabilize the dependency array
+    // Updated fetchListings: fetch listings and then the sellers' ratings
     const fetchListings = useCallback(async () => {
         setLoading(true);
-        
-        // -------- FIX: Proper syntax for joined and aggregated columns
-        // The ratings join and aggregation must be adjusted: 
-        // Supabase expects aggregation in -> ratings:user_ratings!rated_user_id(rating:avg,rating:count)
-        // But, since default=true is a column in listings, don't include .default, just as a filter instead:
-        const { data, error } = await supabase
+
+        // 1. Fetch all listings with their seller (profile)
+        const { data: listingsData, error: listingsError } = await supabase
             .from('listings')
             .select(`
                 *,
-                seller:profiles(contact_person),
-                ratings:user_ratings!rated_user_id(
-                    avg:rating(avg),
-                    count:rating(count)
-                )
+                seller:profiles(contact_person)
             `)
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Error fetching listings:', error);
+        if (listingsError || !listingsData) {
+            console.error('Error fetching listings:', listingsError);
             setListings([]);
             setFilteredListings([]);
-        } else {
-            setListings((data as Listing[]) || []);
-            setFilteredListings((data as Listing[]) || []);
+            setLoading(false);
+            return;
         }
+
+        // 2. Fetch ratings per unique seller (user_id)
+        const uniqueUserIds = Array.from(new Set(listingsData.map((l: any) => l.user_id)));
+        let ratingsMap: Record<string, ListingRatings> = {};
+        if (uniqueUserIds.length > 0) {
+            const { data: ratingsData, error: ratingsError } = await supabase
+                .from('user_ratings')
+                .select('rated_user_id, avg:rating(avg), count:rating(count)')
+                .in('rated_user_id', uniqueUserIds);
+
+            if (ratingsError) {
+                console.error('Error fetching ratings:', ratingsError);
+            } else {
+                ratingsData?.forEach((r: any) => {
+                    ratingsMap[r.rated_user_id] = {
+                        avg: r.avg,
+                        count: r.count
+                    };
+                });
+            }
+        }
+
+        // 3. Merge ratings into listings
+        const listingsWithRatings: Listing[] = listingsData.map((listing: any) => ({
+            ...listing,
+            ratings: ratingsMap[listing.user_id] || { avg: null, count: 0 }
+        }));
+
+        setListings(listingsWithRatings);
+        setFilteredListings(listingsWithRatings);
         setLoading(false);
     }, []); // Dependency array is empty as it only depends on supabase object
 
