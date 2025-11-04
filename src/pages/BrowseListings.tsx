@@ -28,7 +28,10 @@ export default function BrowseListings() {
     setLoading(true);
     const { data, error } = await supabase
       .from('listings')
-      .select('*')
+      .select(`
+            *, // Selects all columns from the 'listings' table
+            seller:profiles(username) // <-- THIS IS THE KEY CHANGE
+        `)
       .eq('status', 'approved')
       .order('created_at', { ascending: false });
 
