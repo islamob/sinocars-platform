@@ -248,3 +248,12 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
         </div>
     );
 }
+interface ListingRatings {
+    avg: number | null;
+    count: number;
+}
+export interface ListingWithSeller extends BaseListing {
+    seller: SellerProfile | null;
+    // The joined 'ratings' will be an array of one object due to aggregation
+    ratings: [ListingRatings] | null; 
+}
