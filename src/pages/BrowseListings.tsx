@@ -62,7 +62,8 @@ export default function BrowseListings({ navigateToUser }: BrowseListingsProps) 
             .from('listings')
             .select(`
                 *,
-                seller:profiles(contact_person)
+            
+                seller:profiles!fk_user_id(contact_person)
             `)
             .eq('status', 'approved')
             .order('created_at', { ascending: false });
