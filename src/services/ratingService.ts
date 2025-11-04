@@ -1,6 +1,5 @@
-// src/lib/ratingService.ts
-
-import { supabase } from '../lib/supabase.ts'; // Adjust path as needed
+// src/services/ratingService.ts
+import { supabase } from '../lib/supabase.ts';
 
 interface RatingPayload {
   ratedUserId: string;
@@ -9,31 +8,32 @@ interface RatingPayload {
 }
 
 export async function submitRating({ ratedUserId, rating, feedback }: RatingPayload) {
-  // ✅ Always await getUser()
   const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData?.user) throw new Error('User must be logged in to submit a rating.');
+  const reviewerId = userData.user.id;
+  const newRating = { reviewer_id: reviewerId, rated_user_id: ratedUserId, rating, feedback };
+  const { data, error } = await supabase.from('user_ratings').insert([newRating]);
+  if (error) throw new Error(`DB Error: ${error.message}`);
+  return data;
+}
 
-  if (userError || !userData?.user) {
-    throw new Error('User must be logged in to submit a rating.');
-  }
+export async function fetchAverageRating(userId: string) {
+  if (!userId) throw new Error('userId is required');
+  const { data, error } = await supabase.from('user_ratings').select('rating').eq('rated_user_id', userId);
+  if (error) throw new Error(`DB Error: ${error.message}`);
+  const ratings = data?.map((r) => r.rating) || [];
+  const total = ratings.length;
+  const avg = total > 0 ? ratings.reduce((a, b) => a + b, 0) / total : 0;
+  return { average_rating: avg, total_ratings: total };
+}
 
-  const raterId = userData.user.id;
-
-  // ✅ Match your actual table column names
-  const newRating = {
-    reviewer_id: raterId,       // note: your table uses reviewer_id, not rater_user_id
-    rated_user_id: ratedUserId,
-    rating,
-    feedback,
-  };
-
+export async function fetchUserFeedbacks(userId: string) {
+  if (!userId) throw new Error('userId is required');
   const { data, error } = await supabase
     .from('user_ratings')
-    .insert([newRating]); // always insert as an array
-
-  if (error) {
-    console.error('Supabase rating submission error:', error.message);
-    throw new Error(`DB Error: ${error.message}`);
-  }
-
+    .select('reviewer_id, rating, feedback, created_at')
+    .eq('rated_user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`DB Error: ${error.message}`);
   return data;
 }
