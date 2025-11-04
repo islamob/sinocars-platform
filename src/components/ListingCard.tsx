@@ -87,15 +87,15 @@ export default function ListingCard({ listing, navigateToUser }: ListingCardProp
                 </div>
             </div>
 
-            {/* ✅ PROFILE NAVIGATION: Fix ensures seller_id is used */}
+            {/* ✅ PROFILE NAVIGATION: Fix ensures user_id is used */}
             <div className="flex items-center text-sm text-gray-700 mb-4">
                 <User size={16} className="mr-2 text-gray-600" />
                 <span>
                     {t('postedBy')}: 
                     <button
                         onClick={() => {
-                            if (listing.seller_id) {
-                                navigateToUser(listing.seller_id);
+                            if (listing.user_id) {
+                                navigateToUser(listing.user_id);
                             } else {
                                 console.warn("Cannot navigate: Seller ID is missing from listing.");
                             }
