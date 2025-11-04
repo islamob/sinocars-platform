@@ -1,40 +1,39 @@
-// Inside src/lib/ratingService.ts (or similar)
+// src/lib/ratingService.ts
 
 import { supabase } from './supabase'; // Adjust path as needed
 
 interface RatingPayload {
-    ratedUserId: string;
-    rating: number;
-    feedback: string;
+  ratedUserId: string;
+  rating: number;
+  feedback: string;
 }
 
-// Ensure the function is strongly typed and handles errors by throwing
 export async function submitRating({ ratedUserId, rating, feedback }: RatingPayload) {
-    
-    // We expect the user to be logged in, so we get the rater's ID
-    const raterId = supabase.auth.getUser()?.data.user?.id;
+  // ✅ Always await getUser()
+  const { data: userData, error: userError } = await supabase.auth.getUser();
 
-    if (!raterId) {
-        throw new Error('User must be logged in to submit a rating.');
-    }
+  if (userError || !userData?.user) {
+    throw new Error('User must be logged in to submit a rating.');
+  }
 
-    const newRating = {
-        rater_user_id: raterId,
-        rated_user_id: ratedUserId,
-        rating: rating,
-        feedback: feedback,
-    };
+  const raterId = userData.user.id;
 
-    const { data, error } = await supabase
-        .from('user_ratings')
-        .insert(newRating);
+  // ✅ Match your actual table column names
+  const newRating = {
+    reviewer_id: raterId,       // note: your table uses reviewer_id, not rater_user_id
+    rated_user_id: ratedUserId,
+    rating,
+    feedback,
+  };
 
-    // If Supabase returns an RLS or other database error, throw it so RatingForm catches it
-    if (error) {
-        console.error('Supabase rating submission error:', error.message);
-        throw new Error(`DB Error: ${error.message}`);
-    }
+  const { data, error } = await supabase
+    .from('user_ratings')
+    .insert([newRating]); // always insert as an array
 
-    // The function simply returns (or returns data) on success
-    return data;
+  if (error) {
+    console.error('Supabase rating submission error:', error.message);
+    throw new Error(`DB Error: ${error.message}`);
+  }
+
+  return data;
 }
